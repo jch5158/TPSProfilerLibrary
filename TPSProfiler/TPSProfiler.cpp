@@ -4,14 +4,6 @@
 
 HANDLE gEvent;
 
-DWORD WINAPI WorkerThread(void* pParam)
-{
-	WaitForSingleObject(gEvent, INFINITE);
-
-	CTPSProfiler::PrintTPSProfile();
-
-	return 1;
-}
 
 
 int wmain()
@@ -20,27 +12,22 @@ int wmain()
 
 	CreateEvent(NULL, false, false, NULL);
 
-	_beginthreadex(NULL, 0, (_beginthreadex_proc_type)WorkerThread, NULL, NULL, NULL);
-
-	CTPSProfiler::SetTPSProfiler(L"TEST");
-
 	CTPSProfiler profiler;
 
-	DWORD time = timeGetTime();
+	profiler.SetTPSProfiler(L"TEST");
 
-	while (timeGetTime() - time < 4000)
+	for (int index = 0; index < 200; ++index)
 	{
-		profiler.SaveTPSInfo(L"TEST_TPS", rand() % 10000);
 
-		if (timeGetTime() - time > 1000)
-		{
-			SetEvent(gEvent);
-		}
+		profiler.SaveTPSInfo(L"UPDATE TPS", 200);
 	}
 
-	CTPSProfiler::PrintTPSProfile();
+	if (profiler.PrintTPSProfile() == FALSE)
+	{
+		std::wcout << L"Failed\n";
+	}
 
-	CTPSProfiler::FreeTPSProfiler();
+	profiler.FreeTPSProfiler();
 
 	return 1;
 }

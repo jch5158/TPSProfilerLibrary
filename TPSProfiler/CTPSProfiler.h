@@ -1,7 +1,5 @@
 #pragma once
 
-#pragma comment(lib,"Winmm.lib")
-
 #include <strsafe.h>
 #include <iostream>
 #include <Windows.h>
@@ -16,6 +14,8 @@ public:
 	class CSRWLock;
 
 	CTPSProfiler(void)
+		:mpTitle(nullptr)
+		,mTPSInfoMap()
 	{
 	}
 
@@ -24,10 +24,8 @@ public:
 	}
 
 
-	static BOOL SetTPSProfiler(const WCHAR* pTitle)
-	{
-		InitializeSRWLock(&mSRWLock);
-
+	BOOL SetTPSProfiler(const WCHAR* pTitle)
+	{	
 		if (pTitle == nullptr)
 		{
 			return FALSE;
@@ -36,19 +34,15 @@ public:
 		// 한글 유니코드 셋팅
 		_wsetlocale(LC_ALL, L"");
 
-		CSRWLock srwLock(&mSRWLock);
-
 		// 저장할 파일 이름 셋팅
-		mTitle = (WCHAR*)pTitle;
+		mpTitle = (WCHAR*)pTitle;
 
 		return TRUE;
 	}
 
 	BOOL SaveTPSInfo(const WCHAR* pTPSName, DWORD TPS)
 	{
-		CSRWLock srwLock(&mSRWLock);
-
-		if (mTitle == nullptr)
+		if (mpTitle == nullptr)
 		{
 			return FALSE;
 		}
@@ -74,11 +68,9 @@ public:
 		return TRUE;
 	}
 
-	static void FreeTPSProfiler(void)
+	void FreeTPSProfiler(void)
 	{
-		CSRWLock srwLock(&mSRWLock);
-
-		mTitle = nullptr;
+		mpTitle = nullptr;
 
 		for (auto& iter : mTPSInfoMap)
 		{
@@ -86,13 +78,13 @@ public:
 		}
 
 		mTPSInfoMap.clear();
+
+		return;
 	}
 
-	static BOOL PrintTPSProfile(void)
+	BOOL PrintTPSProfile(void)
 	{
-		CSRWLock srwLock(&mSRWLock);
-
-		if (mTitle == nullptr)
+		if (mpTitle == nullptr)
 		{
 			return FALSE;
 		}
@@ -116,35 +108,16 @@ public:
 		{
 			stTPSProfile* pTPSProfile = iter.second;
 
-			DOUBLE average = ((DOUBLE)pTPSProfile->totalTPS / pTPSProfile->saveCount);
-
-			fwprintf_s(fp, L"%s, %.6lf, %lld\n", pTPSProfile->pTPSName, average, pTPSProfile->saveCount);
+			fwprintf_s(fp, L"%s, %.6lf TPS, %lld\n", pTPSProfile->pTPSName, (DOUBLE)((DOUBLE)pTPSProfile->totalTPS / pTPSProfile->saveCount), pTPSProfile->saveCount);
 		}
 
 		fclose(fp);
+
+		return TRUE;
 	}
 
 
 private:
-
-	class CSRWLock
-	{
-	public:
-
-		CSRWLock(SRWLOCK* pSRWLock)
-		{
-			AcquireSRWLockExclusive(pSRWLock);
-
-			mpSRWLock = pSRWLock;
-		}
-
-		~CSRWLock(void)
-		{
-			ReleaseSRWLockExclusive(mpSRWLock);
-		}
-
-		SRWLOCK* mpSRWLock;
-	};
 
 	struct stTPSProfile
 	{
@@ -156,7 +129,7 @@ private:
 		ULONGLONG saveCount;
 	};
 
-	static void setLogTitle(WCHAR* pTPSTitle)
+	void setLogTitle(WCHAR* pTPSTitle)
 	{
 		tm nowTime = { 0, };
 
@@ -170,7 +143,7 @@ private:
 		// time_t 값으로 저장 된 시간을 변환 하 고 결과를 tm형식의 구조에 저장 합니다.
 		retval = _localtime64_s(&nowTime, &time64);
 
-		StringCchPrintfW(pTPSTitle, MAX_PATH, L"[%s TPSProfile]_[%d-%02d-%02d_%02d-%02d-%02d].csv", mTitle, nowTime.tm_year + 1900, nowTime.tm_mon + 1, nowTime.tm_mday, nowTime.tm_hour, nowTime.tm_min, nowTime.tm_sec);
+		StringCchPrintfW(pTPSTitle, MAX_PATH, L"[%s TPSProfile]_[%d-%02d-%02d_%02d-%02d-%02d].csv", mpTitle, nowTime.tm_year + 1900, nowTime.tm_mon + 1, nowTime.tm_mday, nowTime.tm_hour, nowTime.tm_min, nowTime.tm_sec);
 
 		return;
 	}
@@ -189,10 +162,8 @@ private:
 		return iter->second;
 	}
 	
-	inline static WCHAR* mTitle;
+	WCHAR* mpTitle;
 
-	inline static SRWLOCK mSRWLock;
-
-	inline static std::unordered_map<const WCHAR*, stTPSProfile*> mTPSInfoMap;
+	std::unordered_map<const WCHAR*, stTPSProfile*> mTPSInfoMap;
 };
 
